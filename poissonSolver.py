@@ -41,7 +41,7 @@ def poisson(H, hx, hy, hz):
     chMat = laplace(P, hx, hy, hz)
 
     erMat = np.abs(H[1:N, 1:M, 1:L] - chMat[1:N, 1:M, 1:L])
-    print "Error after poisson solver is ", np.amax(erMat)
+    print("Error after poisson solver is ",np.amax(erMat))
 
     return P
 
@@ -69,14 +69,14 @@ def solve(rho, hx, hy, hz):
 
         error_temp = np.abs(rho[1:N, 1:M, 1:L] - solLap[1:N, 1:M, 1:L])
         maxErr = np.amax(error_temp)
-        print maxErr
+        print(maxErr)
         if maxErr < tolerance:
             break
 
         jCnt += 1
         if jCnt > 10*N*M*L:
-            print "ERROR: Jacobi not converging. Aborting"
-            print "Maximum error: ", maxErr
+            print("ERROR: Jacobi not converging. Aborting")
+            print("Maximum error: ", maxErr)
             quit()
 
         prev_sol = np.copy(next_sol)
