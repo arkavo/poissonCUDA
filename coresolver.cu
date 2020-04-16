@@ -1,27 +1,33 @@
 #include <stdio.h>
 //declare global limits
-#define X_RANGE 64
-#define Y_RANGE 64
-#define Z_RANGE 64
+#define X_RANGE 8
+#define Y_RANGE 8
+//#define Z_RANGE 8
 
 
 int main()
 {
+    FILE *fp;
+    fp = fopen("data.txt","w+");
     //fast setup
-    float SPACE[X_RANGE][Y_RANGE][Z_RANGE];
+    float SPACE[X_RANGE][Y_RANGE];
     //initial mountain condition
     for(int i=0;i<X_RANGE;i++)
     {
         for(int j=0;j<Y_RANGE;j++)
         {
-            for(int k=0;k<Z_RANGE;k++)
-            {
-                if((i+j+k>=30)&&(i+j+k<=34))
-                    SPACE[i][j][k] = (i+j+k)/90;
-                else
-                    SPACE[i][j][k] = 0;
-            }
+            if(i>=3&&j>=3&&i<=5&&j<=5)
+                SPACE[i][j] = (i+j)/10.0;
+            else
+                SPACE[i][j] = 0;
         }        
     }
     
+    for(int i=0;i<X_RANGE;i++)
+    {
+        for(int j=0;j<Y_RANGE;j++)
+        {
+            fprintf(fp,"%f ",SPACE[i][j]);
+        }        
+    }
 }
