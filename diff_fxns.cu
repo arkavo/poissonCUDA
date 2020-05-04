@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 #include <math.h>
 #include <inttypes.h>
@@ -25,9 +26,10 @@ void device_diff(float* dat,float* dev)
         *(st_dev+i+1) = *(st_dat+1+i) - *(st_dat+i);
     }
 }
-int main()
+int main(int argc,char* argv[])
 {
-    int order = 16;
+    int order = (int)strtol(argv[1],NULL,10);
+    //printf("arg = %d\n",order);
     FILE* fp;
     fp = fopen("linear_diff.txt","w+");
     float data_host[RANGE];
