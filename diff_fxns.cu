@@ -4,6 +4,8 @@
 #include <math.h>
 #include <inttypes.h>
 #include <chrono>
+#include <string.h>
+#include <fstream>
 
 #define RANGE 2048
 #define ITER 10000
@@ -31,6 +33,10 @@ int main(int argc,char* argv[])
     int order = (int)strtol(argv[1],NULL,10);
     //printf("arg = %d\n",order);
     FILE* fp;
+    std::ofstream exc ("data_sheet.csv", std::ofstream::out);
+    //exc.open("data_sheet.csv");
+    exc << "Order, CPU_t, GPU_in_t, GPU_compute_t, GPU_ot_t\n";
+
     fp = fopen("linear_diff.txt","w+");
     float data_host[RANGE];
     float derv_host[RANGE];
@@ -78,9 +84,15 @@ int main(int argc,char* argv[])
     printf("Duration of GPU = %f cpy + %f op + %f res\n",copy_dev.count(),dev_op.count(),hst_cp.count());
     printf("Order = %d\n",order);
     for(int i=0;i<RANGE;i++)
-    {    
+    {     
         //printf("%.2f ",derv_host[i]);
         fprintf(fp,"%.2f ",derv_host[i]);
     }
+    exc <<order,
+        <<(float)duration.count(),
+        (float)copy_dev.count(),
+        (float)dev_op.count(),
+        (float)hst_cp.count();
+    exc.close();
     return 0;
 }
