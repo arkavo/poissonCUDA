@@ -6,25 +6,31 @@
 #include <chrono>
 #include <string.h>
 #include <fstream>
-
+#include <iostream>
+using namespace std;
 #define RANGE 512
 
 float DATA[RANGE][RANGE][RANGE];
 
-struct Vector3
+class Vector3
 {
-    float x;
-    float y;
-    float z;
+    public:
+        float x;
+        float y;
+        float z;
+
+        void set(float x0,float y0, float z0)
+        {
+            x = x0;
+            y = y0;
+            z = z0;
+        }
+        void display()
+        {
+            cout << "("<<x<<","<<y<<","<<z<<")\n";
+        }
 };
 
-Vector3 assign(Vector3 ret,float x, float y,float z)
-{
-    ret.x = x;
-    ret.y = y;
-    ret.z = z;
-    return ret;
-}
 
 __device__ int getGlobalIdx_3D_3D()
 {
@@ -89,5 +95,8 @@ int main()
     void* ADDRESS_LIST;
     ADDRESS_LIST = (void*)malloc(sizeof(int)*nDevices*nDevices*nDevices);
     ADDRESS_LIST = DATA;
+    Vector3 test;
+    test.set(RANGE,RANGE,RANGE);
+    test.display();
     printf("%p\n",ADDRESS_LIST);
 }

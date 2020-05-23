@@ -88,11 +88,11 @@ int main(int argc,char* argv[])
         //printf("%.2f ",derv_host[i]);
         fprintf(fp,"%.2f ",derv_host[i]);
     }
-    exc <<order,
-        <<(float)duration.count(),
-        (float)copy_dev.count(),
-        (float)dev_op.count(),
-        (float)hst_cp.count();
+    exc <<order
+        <<(float)duration.count()
+        <<(float)copy_dev.count()
+        <<(float)dev_op.count()
+        <<(float)hst_cp.count();
     exc.close();
     return 0;
 }
