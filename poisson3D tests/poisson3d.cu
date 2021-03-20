@@ -8,12 +8,21 @@
 #include <fstream>
 #include <iostream>
 //using namespace std;
-#define RANGE 512
+#define RANGE 64
 #define ITER 10000
 #define tol 0.01
+#define dr 1
 
 float field[RANGE][RANGE][RANGE];
 float temp_field[RANGE][RANGE][RANGE];
+//First Derivatives
+float dx[RANGE][RANGE][RANGE];
+float dy[RANGE][RANGE][RANGE];
+float dz[RANGE][RANGE][RANGE];
+//Second Derivatives
+float ddx[RANGE][RANGE][RANGE];
+float ddy[RANGE][RANGE][RANGE];
+float ddz[RANGE][RANGE][RANGE];
 
 void display()
 {
@@ -31,6 +40,56 @@ void display()
     }
 }
 
+void deriv(int mode)
+{
+    if(mode==1)
+    {
+        for(int i=1;i<RANGE-1;i++)
+        {
+            for(int j=1;j<RANGE-1;j++)
+            {
+                for(int k=1;k<RANGE-1;k++)
+                {
+                    dx[i][j][k] = (field[i+1][j][k] - field[i-1][j][k])/(2.0*dr);
+                    dx[0][j][k] = dx[1][j][k];
+                    dx[RANGE][j][k] = dx[RANGE-1][j][k];
+                    
+                    dy[i][j][k] = (field[i][j+1][k] - field[i][j-1][k])/(2.0*dr);
+                    dy[i][0][k] = dy[i][1][k];
+                    dy[i][RANGE][k] = dy[i][RANGE-1][k];
+
+                    dz[i][j][k] = (field[i][j][k+1] - field[i][j][k-1])/(2.0*dr);
+                    dz[i][j][0] = dz[i][j][1];
+                    dz[i][j][RANGE-1] = dz[i][j][RANGE];
+                }
+            }
+        }
+    }
+
+    if(mode==2)
+    {
+        for(int i=1;i<RANGE-1;i++)
+        {
+            for(int j=1;j<RANGE-1;j++)
+            {
+                for(int k=1;k<RANGE-1;k++)
+                {
+                    ddx[i][j][k] = (dx[i+1][j][k] - dx[i-1][j][k])/(2.0*dr);
+                    ddx[0][j][k] = ddx[1][j][k];
+                    ddx[RANGE][j][k] = ddx[RANGE-1][j][k];
+                    
+                    ddy[i][j][k] = (dy[i][j+1][k] - dy[i][j-1][k])/(2.0*dr);
+                    ddy[i][0][k] = ddy[i][1][k];
+                    ddy[i][RANGE][k] = ddy[i][RANGE-1][k];
+
+                    ddz[i][j][k] = (dz[i][j][k+1] - dz[i][j][k-1])/(2.0*dr);
+                    ddz[i][j][0] = ddz[i][j][1];
+                    ddz[i][j][RANGE-1] = ddz[i][j][RANGE];
+                }
+            }
+        }
+    }
+}
 int main(int argc, char* argv[])
 {
     //boundary conditions + init
@@ -86,7 +145,7 @@ int main(int argc, char* argv[])
     }
     auto hst_en = std::chrono::high_resolution_clock::now();
     std::chrono::duration<float> duration = hst_en-hst_st;
-    printf("Duration : %f\n", duration.count());
+    std::cout<<"Duration: "<<duration.count()<<"\n";
     std::cout<<"With "<<loopctr<<" loops\n\n";
     //display();
 }
