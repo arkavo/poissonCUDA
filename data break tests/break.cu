@@ -7,9 +7,11 @@
 #include <string.h>
 #include <fstream>
 #include <iostream>
-using namespace std;
-#define RANGE 512
 
+using namespace std;
+
+#define RANGE 512
+//Global Host data
 float DATA[RANGE][RANGE][RANGE];
 
 class Vector3
@@ -28,6 +30,44 @@ class Vector3
         void display()
         {
             cout << "("<<x<<","<<y<<","<<z<<")\n";
+        }
+};
+
+class GPU_DATASET
+{
+    public:
+        float *GPU_ADDRESS;
+        float *HOST_ADDRESS;
+        Vector3 DIMENSIONS;
+        Vector3 ST_PT;
+        int ACTIVE_DEVICE;
+
+        void SET_DEVICE(int nD)
+        {
+            ACTIVE_DEVICE = nD;
+        }
+
+        void SET_GPU_PTR()
+        {
+            int xDim = (int)DIMENSIONS.x;
+            int yDim = (int)DIMENSIONS.y;
+            int zDim = (int)DIMENSIONS.z;
+            cudaMalloc(&GPU_ADDRESS,sizeof(float)*xDim*yDim*zDim);
+            for(int i=ST_PT.x;i<ST_PT.x+DIMENSIONS.x;i++)
+            {
+                for(int j=ST_PT.y;j<ST_PT.y+DIMENSIONS.y;j++)
+                {
+                    for(int k=ST_PT.z;k<ST_PT.z+DIMENSIONS.z;k++)
+                    {
+                       *(GPU_ADDRESS + i + j*xDim + k*yDim*xDim) = *HOST_ADDRESS;
+                    }
+                }
+            }
+        }
+
+        void derv_x()
+        {
+
         }
 };
 
