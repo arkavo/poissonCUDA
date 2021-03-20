@@ -8,10 +8,11 @@
 #include <fstream>
 #include <iostream>
 //using namespace std;
-#define RANGE 64
+#define RANGE 256
 #define ITER 10000
-#define tol 0.01
+#define tol 0.001
 #define dr 1
+#define dt 0.2
 
 float field[RANGE][RANGE][RANGE];
 float temp_field[RANGE][RANGE][RANGE];
@@ -101,7 +102,7 @@ int main(int argc, char* argv[])
             for(int k=0;k<RANGE;k++)
             {
                 if(i==0||i==RANGE-1||j==0||j==RANGE-1||k==0||k==RANGE-1)
-                    field[i][j][k] = 2;
+                    field[i][j][k] = 20;
                 else
                     field[i][j][k] = 0;
             }
@@ -113,17 +114,31 @@ int main(int argc, char* argv[])
     float err_max = 10.0;
     int loopctr = 0;
     auto hst_st = std::chrono::high_resolution_clock::now();
-    while(err_max>tol)
+    while(abs(err_max)>tol)
     {
+        deriv(1);
+        deriv(2);
+
+        
+        for(int i=0;i<RANGE;i++)
+        {
+            for(int j=0;j<RANGE;j++)
+            {
+                for(int k=0;k<RANGE;k++)
+                {
+                    dx[i][j][k]+=(ddx[i][j][k])*dt;
+                    dy[i][j][k]+=(ddy[i][j][k])*dt;
+                    dz[i][j][k]+=(ddz[i][j][k])*dt;
+                }
+            }
+        }
         for(int i=1;i<RANGE-1;i++)
         {
             for(int j=1;j<RANGE-1;j++)
             {
                 for(int k=1;k<RANGE-1;k++)
                 {
-                    temp_field[i][j][k] = (field[i-1][j][k]+field[i+1][j][k]
-                                        +field[i][j-1][k]+field[i][j+1][k]
-                                        +field[i][j][k-1]+field[i][j][k+1])/6.0;      
+                    temp_field[i][j][k] = field[i][j][k]+(dx[i][j][k]+dy[i][j][k]+dz[i][j][k])*dt;      
                 }
             }
         }
@@ -147,5 +162,6 @@ int main(int argc, char* argv[])
     std::chrono::duration<float> duration = hst_en-hst_st;
     std::cout<<"Duration: "<<duration.count()<<"\n";
     std::cout<<"With "<<loopctr<<" loops\n\n";
+    std::cout<<"Error: "<<err_max<<"\n";
     //display();
 }
