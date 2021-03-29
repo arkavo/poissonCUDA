@@ -8,7 +8,7 @@
 #include <fstream>
 #include <iostream>
 //using namespace std;
-#define RANGE 64
+#define RANGE 4
 #define ITER 10000
 #define tol 0.001
 #define dr 1
@@ -143,6 +143,60 @@ void DECLARE(int nDevice)
         cudaMalloc((void**)&ddz, PARTITION);
     }
 }
+//SINGLE GPU SINGLE THREAD FORCE METHOD
+__device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimension,int order)
+{
+    int index = threadIdx.x + blockIdx.x*blockDim.x;
+    if(dimension==1 && order==1)
+    {
+        if(index%(RANGE-1)!=0)
+        {
+            d[index] = data[index+1] - data[index];
+            return d;
+        }
+    }
+    if(dimension==2 && order==1)
+    {
+        if(index%((RANGE-1)*RANGE-1)!=0)
+        {
+            d[index] = data[index+RANGE] - data[index];
+            return d;
+        }
+    }
+    if(dimension==3 && order==1)
+    {
+        if(index%((RANGE-1)*(RANGE-1)*RANGE-1)!=0)
+        {
+            d[index] = data[index+RANGE*RANGE] - data[index];
+            return d;
+        }
+    }
+    if(dimension==1 && order==2)
+    {
+        if(index%(RANGE-1)!=0)
+        {
+            dd[index] = d[index+1] - d[index];
+            return dd;
+        }
+    }
+    if(dimension==2 && order==2)
+    {
+        if(index%((RANGE-1)*RANGE-1)!=0)
+        {
+            dd[index] = d[index+RANGE] - d[index];
+            return dd;
+        }
+    }
+    if(dimension==3 && order==2)
+    {
+        if(index%((RANGE-1)*(RANGE-1)*RANGE-1)!=0)
+        {
+            dd[index] = d[index+RANGE*RANGE] - d[index];
+            return dd;
+        }
+    }
+}
+
 
 int main(int argc, char* argv[])
 {
@@ -160,6 +214,19 @@ int main(int argc, char* argv[])
             }
         }
     }
+    //GPU COPIES
+    float* DEVICE_DATA;
+    float* trial;
+    unsigned long long TOTAL_SIZE = sizeof(float)*RANGE*RANGE*RANGE;
+    cudaMalloc((void**)&DEVICE_DATA,TOTAL_SIZE);
+    trial = (float*)malloc(TOTAL_SIZE);
+    cudaMemcpy(&DEVICE_DATA,field,TOTAL_SIZE,cudaMemcpyHostToDevice);
+    cudaMemcpy(&trial,DEVICE_DATA,TOTAL_SIZE,cudaMemcpyDeviceToHost);
+    for(int i=0;i<RANGE;i++)
+        for(int j=0;j<RANGE;j++)
+            for(int k=0;k<RANGE;k++)
+                printf("%f ",*trial[i][j][k]);
+    printf("\n");
     //display();
     
     //Linear cpu time
