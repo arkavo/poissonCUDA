@@ -8,12 +8,12 @@
 #include <fstream>
 #include <iostream>
 //using namespace std;
-#define RANGE 256
+#define RANGE 64
 #define ITER 10000
 #define tol 0.001
 #define dr 1
 #define dt 0.2
-
+//ALL HOST TESTING COPIES COPIUM
 float field[RANGE][RANGE][RANGE];
 float temp_field[RANGE][RANGE][RANGE];
 //First Derivatives
@@ -24,6 +24,42 @@ float dz[RANGE][RANGE][RANGE];
 float ddx[RANGE][RANGE][RANGE];
 float ddy[RANGE][RANGE][RANGE];
 float ddz[RANGE][RANGE][RANGE];
+//DEVICE COPIES TO BE ALLOCATED DYNAMICALLY
+void printDevProp(cudaDeviceProp devProp)
+{   
+    printf("%s\n", devProp.name);
+    printf("Major revision number:                   %d\n", devProp.major);
+    printf("Minor revision number:                   %d\n", devProp.minor);
+    printf("Total global memory:                     %zu", devProp.totalGlobalMem);
+    printf("bytes\n");
+    printf("Number of multiprocessors:               %d\n", devProp.multiProcessorCount);
+    printf("Total amount of shared memory per block: %zu\n",devProp.sharedMemPerBlock);
+    printf("Total registers per block:               %d\n", devProp.regsPerBlock);
+    printf("Warp size:                               %d\n", devProp.warpSize);
+    printf("Maximum memory pitch:                    %zu\n", devProp.memPitch);
+    printf("Total amount of constant memory:         %zu\n",   devProp.totalConstMem);
+}
+void device_list()
+{
+    //get Devices
+    int nDevices;
+    /*Hard Set n
+    int nDevices = 1;
+    */
+    cudaGetDeviceCount(&nDevices);
+    //Device list and properties
+    for (int i = 0; i < nDevices; i++) 
+    {
+        cudaDeviceProp prop;
+        cudaGetDeviceProperties(&prop, i);
+        printDevProp(prop);
+        printf("Device Number: %d\n", i);
+        printf("Device name: %s\n", prop.name);
+        printf("Memory Clock Rate (KHz): %d\n",prop.memoryClockRate);
+        printf("Memory Bus Width (bits): %d\n",prop.memoryBusWidth);
+        printf("Peak Memory Bandwidth (GB/s): %f\n\n",2.0*prop.memoryClockRate*(prop.memoryBusWidth/8)/1.0e6);
+    }
+}
 
 void display()
 {
@@ -91,10 +127,26 @@ void deriv(int mode)
         }
     }
 }
+
+void DECLARE(int nDevice)
+{
+    unsigned long long PARTITION = (sizeof(double)*(RANGE-1)*(RANGE-1)*(RANGE-1) )/nDevice + 1;
+    for(int i=0;i<nDevice;i++)
+    {
+        cudaSetDevice(i);
+        double* dx, dy, dz, ddx, ddy, ddz;
+        cudaMalloc((void**)&dx, PARTITION);
+        cudaMalloc((void**)&dy, PARTITION);
+        cudaMalloc((void**)&dz, PARTITION);
+        cudaMalloc((void**)&ddx, PARTITION);
+        cudaMalloc((void**)&ddy, PARTITION);
+        cudaMalloc((void**)&ddz, PARTITION);
+    }
+}
+
 int main(int argc, char* argv[])
 {
     //boundary conditions + init
-    
     for(int i=0;i<RANGE;i++)
     {
         for(int j=0;j<RANGE;j++)
@@ -163,5 +215,6 @@ int main(int argc, char* argv[])
     std::cout<<"Duration: "<<duration.count()<<"\n";
     std::cout<<"With "<<loopctr<<" loops\n\n";
     std::cout<<"Error: "<<err_max<<"\n";
+    //device_list();
     //display();
 }
