@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
     cudaMalloc((void**)&DEVICE_DATA,TOTAL_SIZE);
     trial = (float*)malloc(TOTAL_SIZE);
     cudaMemcpy(&DEVICE_DATA,field,TOTAL_SIZE,cudaMemcpyHostToDevice);
-    cudaMemcpy(&trial,DEVICE_DATA,TOTAL_SIZE,cudaMemcpyDeviceToHost);
+    cudaMemcpy(&trial,&DEVICE_DATA,TOTAL_SIZE,cudaMemcpyDeviceToHost);
     for(int i=0;i<RANGE;i++)
         for(int j=0;j<RANGE;j++)
             for(int k=0;k<RANGE;k++)
