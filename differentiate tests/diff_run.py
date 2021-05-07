@@ -1,4 +1,5 @@
 import subprocess as sp
+import numpy as np
 #import readline
 sp.call(["nvcc","diff_fxns.cu","-o","df.exe"])
 

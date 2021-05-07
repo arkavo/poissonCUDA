@@ -25,6 +25,9 @@ float ddx[RANGE][RANGE][RANGE];
 float ddy[RANGE][RANGE][RANGE];
 float ddz[RANGE][RANGE][RANGE];
 //DEVICE COPIES TO BE ALLOCATED DYNAMICALLY
+
+int FX = 0;
+
 void printDevProp(cudaDeviceProp devProp)
 {   
     printf("%s\n", devProp.name);
@@ -37,7 +40,7 @@ void printDevProp(cudaDeviceProp devProp)
     printf("Total registers per block:               %d\n", devProp.regsPerBlock);
     printf("Warp size:                               %d\n", devProp.warpSize);
     printf("Maximum memory pitch:                    %zu\n", devProp.memPitch);
-    printf("Total amount of constant memory:         %zu\n",   devProp.totalConstMem);
+    printf("Total amount of constant memory:         %zu\n", devProp.totalConstMem);
 }
 void device_list()
 {
@@ -144,7 +147,7 @@ void DECLARE(int nDevice)
     }
 }
 //SINGLE GPU SINGLE THREAD FORCE METHOD
-__device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimension,int order)
+__global__ void DEVICE_DIFF_FXN(double* result, double* data,double* d,double* dd,int dimension,int order)
 {
     int index = threadIdx.x + blockIdx.x*blockDim.x;
     if(dimension==1 && order==1)
@@ -152,7 +155,6 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%(RANGE-1)!=0)
         {
             d[index] = data[index+1] - data[index];
-            return d;
         }
     }
     if(dimension==2 && order==1)
@@ -160,7 +162,6 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%((RANGE-1)*RANGE-1)!=0)
         {
             d[index] = data[index+RANGE] - data[index];
-            return d;
         }
     }
     if(dimension==3 && order==1)
@@ -168,7 +169,6 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%((RANGE-1)*(RANGE-1)*RANGE-1)!=0)
         {
             d[index] = data[index+RANGE*RANGE] - data[index];
-            return d;
         }
     }
     if(dimension==1 && order==2)
@@ -176,7 +176,6 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%(RANGE-1)!=0)
         {
             dd[index] = d[index+1] - d[index];
-            return dd;
         }
     }
     if(dimension==2 && order==2)
@@ -184,7 +183,6 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%((RANGE-1)*RANGE-1)!=0)
         {
             dd[index] = d[index+RANGE] - d[index];
-            return dd;
         }
     }
     if(dimension==3 && order==2)
@@ -192,11 +190,90 @@ __device__ double* DEVICE_DIFF_FXN(double* data,double* d,double* dd,int dimensi
         if(index%((RANGE-1)*(RANGE-1)*RANGE-1)!=0)
         {
             dd[index] = d[index+RANGE*RANGE] - d[index];
-            return dd;
+        }
+    }
+    if(order==1)
+        result = d;
+    if(order==2)
+        result = dd;
+}
+__global__ void INITIAL(double* DEVICE_DATA)
+{
+    for(int i=0;i<RANGE;i++)
+    {
+        for(int j=0;j<RANGE;j++)
+        {
+            for(int k=0;k<RANGE;k++)
+            {
+                if(i==0||i==RANGE-1||j==0||j==RANGE-1||k==0||k==RANGE-1)
+                    *(DEVICE_DATA+i+j*RANGE+k*RANGE*RANGE) = 20.;
+                else
+                    *(DEVICE_DATA+i+j*RANGE+k*RANGE*RANGE) = 0.;
+            }
         }
     }
 }
-
+__host__ double* UPDATE(double* DEVICE_DATA, double* up, int mode)
+{
+    if (mode==1)
+    {
+        for(int i=0;i<RANGE;i++)
+            for(int j=0;j<RANGE;j++)
+                for(int k=0;k<RANGE;k++)
+                    *(DEVICE_DATA+i+j*RANGE+k*RANGE*RANGE) += *(up+i+j*RANGE+k*RANGE*RANGE) * dt;
+    }
+    if (mode==2)
+    {
+        for(int i=0;i<RANGE;i++)
+            for(int j=0;j<RANGE;j++)
+                for(int k=0;k<RANGE;k++)
+                    *(DEVICE_DATA+i+j*RANGE+k*RANGE*RANGE) += *(up+i+j*RANGE+k*RANGE*RANGE) * dt*dt/2;
+    }
+    return DEVICE_DATA;
+}
+__global__ void UPDATE(double* R,double* S)
+{
+    int index = threadIdx.x + blockIdx.x*blockDim.x;
+    for(int i=0;i<RANGE;i++)
+    {
+        R[index+i] += S[index+i];
+        S[index+i] = 0;
+    }
+}
+__global__ void ERROR_CHECK(double* DEVICE_P, double* DEVICE_C)
+{
+    int index = threadIdx.x + blockIdx.x*blockDim.x; 
+    double err_max = 0.01;
+    for(int i=0;i<RANGE;i++)
+    {
+        if((DEVICE_C[index+i]-DEVICE_P[index+1])<=err_max)
+            FX = 1;        
+    }
+}
+int poisson3d(double* DEVICE_P, double* DEVICE_C, double* DEVICE_CX,double* DEVICE_CXX, double* DEVICE_S_CX,double* DEVICE_S_CXX)
+{
+    int loopctr = 0;
+    double error = 10000.0;
+    double err_max = 0.01;
+    while (FX==0)
+    {
+        loopctr += 1;
+        INITIAL<<<1,1>>>(DEVICE_P);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,1,1);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_CX);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,1,2);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_CX);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,1,3);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_CX);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,2,1);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CXX,DEVICE_CXX);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,2,2);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CXX,DEVICE_CXX);
+        DEVICE_DIFF_FXN<<<RANGE,RANGE>>>(DEVICE_S_CX,DEVICE_C,DEVICE_CX,DEVICE_CXX,2,3);
+        UPDATE<<<RANGE,RANGE>>>(DEVICE_S_CXX,DEVICE_CXX);
+    }
+    return loopctr;
+}
 
 int main(int argc, char* argv[])
 {
@@ -215,73 +292,86 @@ int main(int argc, char* argv[])
         }
     }
     //GPU COPIES
-    float* DEVICE_DATA;
-    float* trial;
-    unsigned long long TOTAL_SIZE = sizeof(float)*RANGE*RANGE*RANGE;
-    cudaMalloc((void**)&DEVICE_DATA,TOTAL_SIZE);
-    trial = (float*)malloc(TOTAL_SIZE);
-    cudaMemcpy(&DEVICE_DATA,field,TOTAL_SIZE,cudaMemcpyHostToDevice);
-    cudaMemcpy(&trial,&DEVICE_DATA,TOTAL_SIZE,cudaMemcpyDeviceToHost);
-    for(int i=0;i<RANGE;i++)
-        for(int j=0;j<RANGE;j++)
-            for(int k=0;k<RANGE;k++)
-                printf("%f ",*trial[i][j][k]);
+    double* DEVICE_P;
+    double* DEVICE_C;
+    double* DEVICE_CX;
+    double* DEVICE_S_CX;
+    double* DEVICE_CXX;
+    double* DEVICE_S_CXX;
+    double* trial;
+    unsigned long long TOTAL_SIZE = sizeof(double)*RANGE*RANGE*RANGE;
+    cudaMalloc((void**)&DEVICE_P,TOTAL_SIZE);
+    cudaMalloc((void**)&DEVICE_C,TOTAL_SIZE);
+    cudaMalloc((void**)&DEVICE_CX,TOTAL_SIZE);
+    cudaMalloc((void**)&DEVICE_S_CX,TOTAL_SIZE);
+    cudaMalloc((void**)&DEVICE_CXX,TOTAL_SIZE);
+    cudaMalloc((void**)&DEVICE_S_CXX,TOTAL_SIZE);
+    trial = (double*)malloc(TOTAL_SIZE);
+    cudaMemcpy(&DEVICE_C,field,TOTAL_SIZE,cudaMemcpyHostToDevice);
+    
+    cudaMemcpy(&trial,&DEVICE_C,TOTAL_SIZE,cudaMemcpyDeviceToHost);
+    
+    for(int i=0;i<RANGE;i++){
+        for(int j=0;j<RANGE;j++){
+            for(int k=0;k<RANGE;k++){
+                printf("%f \n",*(trial+i+j*RANGE+j*RANGE*RANGE));}}}
     printf("\n");
     //display();
     
     //Linear cpu time
-    float err_max = 10.0;
-    int loopctr = 0;
-    auto hst_st = std::chrono::high_resolution_clock::now();
-    while(abs(err_max)>tol)
-    {
-        deriv(1);
-        deriv(2);
+    
+    // float err_max = 10.0;
+    // int loopctr = 0;
+    // auto hst_st = std::chrono::high_resolution_clock::now();
+    // while(abs(err_max)>tol)
+    // {
+    //     deriv(1);
+    //     deriv(2);
 
         
-        for(int i=0;i<RANGE;i++)
-        {
-            for(int j=0;j<RANGE;j++)
-            {
-                for(int k=0;k<RANGE;k++)
-                {
-                    dx[i][j][k]+=(ddx[i][j][k])*dt;
-                    dy[i][j][k]+=(ddy[i][j][k])*dt;
-                    dz[i][j][k]+=(ddz[i][j][k])*dt;
-                }
-            }
-        }
-        for(int i=1;i<RANGE-1;i++)
-        {
-            for(int j=1;j<RANGE-1;j++)
-            {
-                for(int k=1;k<RANGE-1;k++)
-                {
-                    temp_field[i][j][k] = field[i][j][k]+(dx[i][j][k]+dy[i][j][k]+dz[i][j][k])*dt;      
-                }
-            }
-        }
-        for(int i=1;i<RANGE-1;i++)
-        {
-            for(int j=1;j<RANGE-1;j++)
-            {
-                for(int k=1;k<RANGE-1;k++)
-                {
-                    err_max = temp_field[i][j][k] - field[i][j][k];
-                    loopctr++;
-                    //if(loopctr%2000000==0)
-                    //    std::cout<<loopctr<<" iters\n";
-                    field[i][j][k] = temp_field[i][j][k];
-                }
-            }
-        }
+    //     for(int i=0;i<RANGE;i++)
+    //     {
+    //         for(int j=0;j<RANGE;j++)
+    //         {
+    //             for(int k=0;k<RANGE;k++)
+    //             {
+    //                 dx[i][j][k]+=(ddx[i][j][k])*dt;
+    //                 dy[i][j][k]+=(ddy[i][j][k])*dt;
+    //                 dz[i][j][k]+=(ddz[i][j][k])*dt;
+    //             }
+    //         }
+    //     }
+    //     for(int i=1;i<RANGE-1;i++)
+    //     {
+    //         for(int j=1;j<RANGE-1;j++)
+    //         {
+    //             for(int k=1;k<RANGE-1;k++)
+    //             {
+    //                 temp_field[i][j][k] = field[i][j][k]+(dx[i][j][k]+dy[i][j][k]+dz[i][j][k])*dt;      
+    //             }
+    //         }
+    //     }
+    //     for(int i=1;i<RANGE-1;i++)
+    //     {
+    //         for(int j=1;j<RANGE-1;j++)
+    //         {
+    //             for(int k=1;k<RANGE-1;k++)
+    //             {
+    //                 err_max = temp_field[i][j][k] - field[i][j][k];
+    //                 loopctr++;
+    //                 //if(loopctr%2000000==0)
+    //                 //    std::cout<<loopctr<<" iters\n";
+    //                 field[i][j][k] = temp_field[i][j][k];
+    //             }
+    //         }
+    //     }
         
-    }
-    auto hst_en = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<float> duration = hst_en-hst_st;
-    std::cout<<"Duration: "<<duration.count()<<"\n";
-    std::cout<<"With "<<loopctr<<" loops\n\n";
-    std::cout<<"Error: "<<err_max<<"\n";
+    // }
+    // auto hst_en = std::chrono::high_resolution_clock::now();
+    // std::chrono::duration<float> duration = hst_en-hst_st;
+    // std::cout<<"Duration: "<<duration.count()<<"\n";
+    //std::cout<<"With "<<loopctr<<" loops\n\n";
+    //std::cout<<"Error: "<<err_max<<"\n";
     //device_list();
     //display();
 }
