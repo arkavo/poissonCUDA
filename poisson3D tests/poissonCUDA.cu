@@ -2,16 +2,16 @@
 #include <iostream>
 #include <cmath>
 
-#define X 4
-#define Y 4
-#define Z 4
+#define X 40
+#define Y 40
+#define Z 40
 
 __global__ void DX(double* R, double* C,double dx)
 {
     int index = threadIdx.x*X + blockIdx.x*X*Y;
     for(int i=1;i<X-1;i++)
     {
-        R[index] = (C[index+1]-C[index-1])/(dx*2);
+        R[index] = (C[index+1+i]-C[index-1-i])/(dx*2);
     }
 }
 
@@ -20,23 +20,26 @@ __global__ void DY(double* R, double* C,double dy)
     int index = threadIdx.x + blockIdx.x*X*Y;
     for(int i=1;i<Y-1;i++)
     {
-        R[index] = (C[index+X]-C[index-X])/(dy*2);
+        R[index] = (C[index+X*(i+1)]-C[index-X*(i+1)])/(dy*2);
     }
 }
 
 __global__ void DZ(double* R, double* C,double dz)
 {
     int index = threadIdx.x + blockIdx.x*X;
-    for(int i=0;i<Z-1;i++)
+    for(int i=1;i<Z-1;i++)
     {
-        R[index] = (C[index+X*Y]-C[index-X*Y])/(dz*2);
+        R[index] = (C[index+X*Y*(i+1)]-C[index-X*Y*(i+1)])/(dz*2);
     }
 }
 
 __global__ void DDX(double* R, double* C,double dx)
 {
     int index = threadIdx.x*X + blockIdx.x*X*Y;
-    R[index] = (C[index+1]+C[index-1]-2*C[index])/(dx*dx);
+    for(int i=1;i<X-1;i++)
+    {
+        R[index] = (C[index+1+i]+C[index-1-i]-2*C[index])/(dx*dx);
+    }
 }
 
 __global__ void DDY(double* R, double* C,double dy)
@@ -44,7 +47,7 @@ __global__ void DDY(double* R, double* C,double dy)
     int index = threadIdx.x + blockIdx.x*X*Y;
     for(int i=1;i<Y-1;i++)
     {
-        R[index] = (C[index+X]+C[index-X]-2*C[index])/(dy*dy);
+        R[index] = (C[index+X*(i+1)]+C[index-X*(i+1)]-2*C[index])/(dy*dy);
     }
 }
 
@@ -53,7 +56,7 @@ __global__ void DDZ(double* R, double* C,double dz)
     int index = threadIdx.x + blockIdx.x*X;
     for(int i=0;i<Z-1;i++)
     {
-        R[index] = (C[index+X*Y]+C[index-X*Y]-2*C[index])/(dz*dz);
+        R[index] = (C[index+X*Y*(i+1)]+C[index-X*Y*(i+1)]-2*C[index])/(dz*dz);
     }
 }
 
@@ -80,11 +83,15 @@ __global__ void COMPARE(double* R, double*C, double* OUT_H)
     int index = threadIdx.x*X+blockIdx.x*X*Y;
     for(int i=0;i<X;i++)
     {
-        if(abs(R[index]-C[index])>=*OUT_H)
+        if(abs(R[index]-C[index])>=OUT_H[0])
         {
-            *OUT_H = abs(R[index]-C[index]);
+            OUT_H[0] = abs(R[index]-C[index]);
         }
     }
+}
+__global__ void RESET_CTR(double* C)
+{
+    C[0] = 0;
 }
 void display(double* DATA)
 {
@@ -107,7 +114,7 @@ int main()
                         DATA_H[i][j][k] = 0;
     }}}
     
-    double step = 0.01;
+    double step = 0.1;
     double* CC;
     double CCD = 0;
 
@@ -139,7 +146,6 @@ int main()
     
     cudaMalloc(&CC,sizeof(double));
     //cudaMemcpy(CC,&CCD,sizeof(double),cudaMemcpyHostToDevice);
-    *CC = 0;
     CCD = 1;
 
     cudaMemcpy(DATA_ORIGINAL,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
@@ -148,6 +154,7 @@ int main()
     
     while(CCD>=tol)
     {
+        RESET_CTR<<<1,1>>>(CC);
         DX<<<Y,Z>>>(DX_D,DATA_ORIGINAL,10);
         DY<<<Z,X>>>(DY_D,DATA_ORIGINAL,10);
         DZ<<<Z,X>>>(DZ_D,DATA_ORIGINAL,10);
@@ -171,7 +178,7 @@ int main()
         {
             printf("%d loops %0.3lf max error\r",ct,CCD);
         }
-        *CC = 0;
+        //*CC = 0;
     }
     printf("Converged in %d loops\n",ct);
     cudaFree(DATA_ORIGINAL);
