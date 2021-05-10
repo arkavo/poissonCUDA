@@ -155,6 +155,7 @@ int main()
     while(CCD>=tol)
     {
         RESET_CTR<<<1,1>>>(CC);
+        printf("%lf\r",*CC);
         DX<<<Y,Z>>>(DX_D,DATA_ORIGINAL,10);
         DY<<<Z,X>>>(DY_D,DATA_ORIGINAL,10);
         DZ<<<Z,X>>>(DZ_D,DATA_ORIGINAL,10);
@@ -169,7 +170,9 @@ int main()
         ADD<<<Y,Z>>>(DATA_NEXT,DDX_D,step*step);
         ADD<<<Y,Z>>>(DATA_NEXT,DDY_D,step*step);
         ADD<<<Y,Z>>>(DATA_NEXT,DDZ_D,step*step);
+        
         COMPARE<<<Y,Z>>>(DATA_NEXT,DATA_ORIGINAL,CC);
+        
         cudaMemcpy(&CCD,CC,sizeof(double),cudaMemcpyDeviceToHost);
         //printf("%0.3lf\r",CCD);
         ASSIGN<<<Y-2,Z-2>>>(DATA_ORIGINAL,DATA_NEXT);
