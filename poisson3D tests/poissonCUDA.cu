@@ -1,97 +1,100 @@
 #include <stdio.h>
 #include <iostream>
 #include <cmath>
+#include <limits.h>
 
-#define X 40
-#define Y 40
-#define Z 40
+using namespace std;
+
+#define X 32
+#define Y 32
+#define Z 32
 
 __global__ void DX(double* R, double* C,double dx)
 {
-    int index = threadIdx.x*X + blockIdx.x*X*Y;
+    int index = threadIdx.x*X + blockIdx.x*X*Y +X+X*Y;
     for(int i=1;i<X-1;i++)
     {
-        R[index] = (C[index+1+i]-C[index-1-i])/(dx*2);
+        *(R+index+i) = (*(C+index+1+i) - *(C+index-1+i))/(dx*2);
     }
 }
 
 __global__ void DY(double* R, double* C,double dy)
 {
-    int index = threadIdx.x + blockIdx.x*X*Y;
+    int index = threadIdx.x + blockIdx.x*X*Y+ X + X*Y;
     for(int i=1;i<Y-1;i++)
     {
-        R[index] = (C[index+X*(i+1)]-C[index-X*(i+1)])/(dy*2);
+        *(R+index+i) = (*(C+index+X*(i+1)) - *(C+index+X*(i-1)))/(dy*2);
     }
 }
 
 __global__ void DZ(double* R, double* C,double dz)
 {
-    int index = threadIdx.x + blockIdx.x*X;
+    int index = threadIdx.x + blockIdx.x*X+X+X*Y;
     for(int i=1;i<Z-1;i++)
     {
-        R[index] = (C[index+X*Y*(i+1)]-C[index-X*Y*(i+1)])/(dz*2);
+        *(R+index+i) = (*(C+index+X*Y*(i+1))-*(C+index+X*Y*(i-1)))/(dz*2);
     }
 }
 
 __global__ void DDX(double* R, double* C,double dx)
 {
-    int index = threadIdx.x*X + blockIdx.x*X*Y;
+    int index = threadIdx.x*X + blockIdx.x*X*Y + X+X*Y;
     for(int i=1;i<X-1;i++)
     {
-        R[index] = (C[index+1+i]+C[index-1-i]-2*C[index])/(dx*dx);
+        *(R+index+i) = (*(C+index+1+i) + *(C+index-1+i) - 2* *(C+index+i))/(dx*dx);
     }
 }
 
 __global__ void DDY(double* R, double* C,double dy)
 {
-    int index = threadIdx.x + blockIdx.x*X*Y;
+    int index = threadIdx.x + blockIdx.x*X*Y+X+X*Y;
     for(int i=1;i<Y-1;i++)
     {
-        R[index] = (C[index+X*(i+1)]+C[index-X*(i+1)]-2*C[index])/(dy*dy);
+        *(R+index+i) = (*(C+index+X*(i+1)) + *(C+index+X*(i-1)) - 2* *(C+index+i))/(dy*dy);
     }
 }
 
 __global__ void DDZ(double* R, double* C,double dz)
 {
-    int index = threadIdx.x + blockIdx.x*X;
+    int index = threadIdx.x + blockIdx.x*X+X+X*Y;
     for(int i=0;i<Z-1;i++)
     {
-        R[index] = (C[index+X*Y*(i+1)]+C[index-X*Y*(i+1)]-2*C[index])/(dz*dz);
+        *(R+index+i) = (*(C+index+X*Y*(i+1))+*(C+index+X*Y*(i-1))-2* *(C+index+i))/(dz*dz);
     }
 }
 
 __global__ void ASSIGN(double* R, double* C)
 {
-    int index = threadIdx.x*X + blockIdx.x*X*Y;
+    int index = threadIdx.x*X + blockIdx.x*X*Y + X + X*Y ;
     for(int i=1;i<X-1;i++)
     {
-        R[index+i-1+X*Y+X] = C[index+i+X*Y+X];
+        *(R+index+i) = *(C+index+i);
     }
 }
 
 __global__ void ADD(double* R,double* C,double dt)
 {
-    int index = threadIdx.x*X+blockIdx.x*X*Y;
+    int index = threadIdx.x*X+blockIdx.x*X*Y+X+X*Y;
     for(int i=0;i<X;i++)
     {
-        R[index+i] += C[index+i] * dt;
+        *(R+index+i) += (*(C+index+i) * dt);
     }
 }
 
-__global__ void COMPARE(double* R, double*C, double* OUT_H)
+__global__ void COMPARE(double* R, double* C, double* OUT_H)
 {
-    int index = threadIdx.x*X+blockIdx.x*X*Y;
-    for(int i=0;i<X;i++)
+    int index = threadIdx.x * X + blockIdx.x * X * Y+X+X*Y;
+    for(int i=1;i<X-1;i++)
     {
-        if(abs(R[index]-C[index])>=OUT_H[0])
+        if(abs(*(R+index+i)-*(C+index+i))>= *OUT_H)
         {
-            OUT_H[0] = abs(R[index]-C[index]);
+            *OUT_H = abs(*(R+index+i) - *(C+index+i));
         }
     }
 }
 __global__ void RESET_CTR(double* C)
 {
-    C[0] = 0;
+    *C = 0;
 }
 void display(double* DATA)
 {
@@ -109,16 +112,16 @@ int main()
             {for(int k=0;k<Z;k++)
                 {
                     if(i==0||i==(X-1)||j==0||j==(Y-1)||k==0||k==(Z-1))
-                        DATA_H[i][j][k] = 2;
+                        DATA_H[i][j][k] = i+j+k;
                     else
                         DATA_H[i][j][k] = 0;
     }}}
     
-    double step = 0.1;
+    double step = 0.01;
     double* CC;
     double CCD = 0;
 
-    double tol = 0.001;
+    double tol = 0.00001;
 
     double* DATA_ORIGINAL;
     //double* DATA_TRIMMED;
@@ -130,60 +133,73 @@ int main()
     double* DDY_D;
     double* DDZ_D;
     
-    unsigned long long SIZE_0 = sizeof(double)*X*Y*Z;
+    unsigned long long SIZE_0 = ((int)sizeof(double))*X*Y*Z;
     //unsigned long long SIZE_1 = sizeof(double)*(X-2)*(Y-2)*(Z-2);
     
-    cudaMalloc(&DATA_ORIGINAL,SIZE_0);
+    cudaMalloc((void**)&DATA_ORIGINAL,SIZE_0);
     //cudaMalloc(&DATA_TRIMMED,SIZE_1);
-    cudaMalloc(&DATA_NEXT,SIZE_0);
+    cudaMalloc((void**)&DATA_NEXT,SIZE_0);
     
-    cudaMalloc(&DX_D,SIZE_0);
-    cudaMalloc(&DY_D,SIZE_0);
-    cudaMalloc(&DZ_D,SIZE_0);
-    cudaMalloc(&DDX_D,SIZE_0);
-    cudaMalloc(&DDY_D,SIZE_0);
-    cudaMalloc(&DDZ_D,SIZE_0);
+    cudaMalloc((void**)&DX_D,SIZE_0);
+    cudaMalloc((void**)&DY_D,SIZE_0);
+    cudaMalloc((void**)&DZ_D,SIZE_0);
+    cudaMalloc((void**)&DDX_D,SIZE_0);
+    cudaMalloc((void**)&DDY_D,SIZE_0);
+    cudaMalloc((void**)&DDZ_D,SIZE_0);
     
-    cudaMalloc(&CC,sizeof(double));
+    cudaMalloc(&CC,(int)sizeof(double));
     //cudaMemcpy(CC,&CCD,sizeof(double),cudaMemcpyHostToDevice);
-    CCD = 1;
+    CCD = 10;
 
-    cudaMemcpy(DATA_ORIGINAL,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
+    cudaMemcpy(DATA_ORIGINAL,&DATA_H,SIZE_0,cudaMemcpyHostToDevice);
+    cudaMemcpy(DATA_NEXT,&DATA_H,SIZE_0,cudaMemcpyHostToDevice);
+    double DATA_F[X][Y][Z];
+    double DATA_FF[X][Y][Z];
+    
+    cudaMemcpy(&DATA_FF,DATA_ORIGINAL,SIZE_0,cudaMemcpyDeviceToHost);
+    //display(&DATA_FF[0][0][0]);
     //ASSIGN<<<Y,Z>>>(DATA_TRIMMED,DATA_ORIGINAL);
     int ct = 0;
-    
+    //ADD <<<Y,Z>>> (DATA_NEXT,DATA_ORIGINAL,1);
     while(CCD>=tol)
     {
-        RESET_CTR<<<1,1>>>(CC);
-        printf("%lf\r",*CC);
-        DX<<<Y,Z>>>(DX_D,DATA_ORIGINAL,10);
-        DY<<<Z,X>>>(DY_D,DATA_ORIGINAL,10);
-        DZ<<<Z,X>>>(DZ_D,DATA_ORIGINAL,10);
+        RESET_CTR  <<<1,1>>>  (CC);
+        //printf("%lf\r",*CC);
+        //DX <<<Y-2,Z-2>>> (DX_D,DATA_ORIGINAL,1.);
+        //DY <<<Z-2,X-2>>> (DY_D,DATA_ORIGINAL,1.);
+        //DZ <<<Z-2,X-2>>> (DZ_D,DATA_ORIGINAL,1.);
 
-        DDX<<<Y,Z>>>(DDX_D,DATA_ORIGINAL,10);
-        DDY<<<Z,X>>>(DDY_D,DATA_ORIGINAL,10);
-        DDZ<<<X,Y>>>(DDZ_D,DATA_ORIGINAL,10);
+        DDY <<<Z-2,X-2>>> (DDY_D,DATA_ORIGINAL,10.);
+        DDZ <<<X-2,Y-2>>> (DDZ_D,DATA_ORIGINAL,10.);
+        DDX <<<Y-2,Z-2>>> (DDX_D,DATA_ORIGINAL,10.);
         
-        ADD<<<Y,Z>>>(DATA_NEXT,DX_D,step);
-        ADD<<<Y,Z>>>(DATA_NEXT,DY_D,step);
-        ADD<<<Y,Z>>>(DATA_NEXT,DZ_D,step);
-        ADD<<<Y,Z>>>(DATA_NEXT,DDX_D,step*step);
-        ADD<<<Y,Z>>>(DATA_NEXT,DDY_D,step*step);
-        ADD<<<Y,Z>>>(DATA_NEXT,DDZ_D,step*step);
+        //ADD <<<Y-2,Z-2>>> (DATA_NEXT,DX_D,-1*step);        
+        //ADD <<<Y-2,Z-2>>> (DATA_NEXT,DY_D,-1*step);
+        //ADD <<<Y-2,Z-2>>> (DATA_NEXT,DZ_D,-1*step);
+        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDX_D,step);
+        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDY_D,step);
+        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDZ_D,step);
         
-        COMPARE<<<Y,Z>>>(DATA_NEXT,DATA_ORIGINAL,CC);
+        COMPARE<<<Y-2,Z-2>>>(DATA_ORIGINAL,DATA_NEXT,CC);
         
         cudaMemcpy(&CCD,CC,sizeof(double),cudaMemcpyDeviceToHost);
         //printf("%0.3lf\r",CCD);
-        ASSIGN<<<Y-2,Z-2>>>(DATA_ORIGINAL,DATA_NEXT);
+        
+        ASSIGN  <<<Y-2,Z-2>>>  (DATA_ORIGINAL,DATA_NEXT);
+        
         ct += 1;
         if(ct%1000==0)
         {
-            printf("%d loops %0.3lf max error\r",ct,CCD);
+            cudaMemcpy(&CCD,CC,sizeof(double),cudaMemcpyDeviceToHost);
+            printf("%d loops %0.6lf max error\r",ct,CCD);
         }
         //*CC = 0;
     }
-    printf("Converged in %d loops\n",ct);
+    //double DATA_F[X][Y][Z];
+    cudaMemcpy(DATA_F,DATA_ORIGINAL,SIZE_0,cudaMemcpyDeviceToHost);
+    printf("\nConverged in %d loops\n",ct-1);
+    printf("%d\n",SIZE_0);
+    //display(&DATA_F[0][0][0]);
     cudaFree(DATA_ORIGINAL);
     //cudaFree(DATA_TRIMMED);
     cudaFree(DATA_NEXT);
@@ -193,6 +209,6 @@ int main()
     cudaFree(DDX_D);
     cudaFree(DDY_D);
     cudaFree(DDZ_D);
-    //display(datap);
+    
     return 0;
 }
