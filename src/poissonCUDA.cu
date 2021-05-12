@@ -131,7 +131,7 @@ int main()
             {for(int k=0;k<Z;k++)
                 {
                     if(i==0||i==(X-1)||j==0||j==(Y-1)||k==0||k==(Z-1))
-                        DATA_H[i][j][k] = i+j+k;
+                        DATA_H[i][j][k] = 5;
                     else
                         DATA_H[i][j][k] = 0;
     }}}
