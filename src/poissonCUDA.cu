@@ -9,12 +9,6 @@
 
 using namespace std;
 
-//Define Global variables
-
-//#define X 5
-//#define Y 5
-//#define Z 5
-
 //Box struct
 struct BOX
 {
@@ -22,36 +16,7 @@ struct BOX
     int Y;
     int Z;
 };
-/*
-//X derivative (unused)
 
-__global__ void DX(double* R, double* C,double dx)
-{
-    int index = threadIdx.x*X + blockIdx.x*X*Y +X+X*Y;
-    for(int i=1;i<X-1;i++)
-    {
-        *(R+index+i) = (*(C+index+1+i) - *(C+index-1+i))/(dx*2);
-    }
-}
-//Y derivative (unused)
-__global__ void DY(double* R, double* C,double dy)
-{
-    int index = threadIdx.x + blockIdx.x*X*Y+ X + X*Y;
-    for(int i=1;i<Y-1;i++)
-    {
-        *(R+index+i) = (*(C+index+X*(i+1)) - *(C+index+X*(i-1)))/(dy*2);
-    }
-}
-//Z derivative (unused)
-__global__ void DZ(double* R, double* C,double dz)
-{
-    int index = threadIdx.x + blockIdx.x*X+X+X*Y;
-    for(int i=1;i<Z-1;i++)
-    {
-        *(R+index+i) = (*(C+index+X*Y*(i+1))-*(C+index+X*Y*(i-1)))/(dz*2);
-    }
-}
-*/
 //X double derivative
 __global__ void DDX(double* R, double* C,int X,int Y,int Z,double dx)
 {
