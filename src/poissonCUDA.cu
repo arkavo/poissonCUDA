@@ -120,7 +120,7 @@ int main()
 {
     //DECLARE YOUR VARIABLES HERE
     
-    struct BOX grid = {20,20,20};
+    struct BOX grid = {100,60,60};
     //step for double derivatives
     double step = 0.01;
     //tolerence
@@ -189,25 +189,26 @@ int main()
     
     //counter
     int ct = 0;
-    
+    int threads = 4;
+    int blocks = (Y-2) * (Z-2) / threads;
     //run while tolerence > difference
     while(CCD>tol)
     {
         //reset difference every loop
         RESET_CTR  <<<1,1>>>  (CC);
         //run derivatives
-        DDY <<<Y*Z/8,8>>> (DDY_D,DATA_ORIGINAL,X,Y,Z,10.);
-        DDZ <<<Y*Z/8,8>>> (DDZ_D,DATA_ORIGINAL,X,Y,Z,10.);
-        DDX <<<Y*Z/8,8>>> (DDX_D,DATA_ORIGINAL,X,Y,Z,10.);     //add into state 1
-        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDX_D,step,X,Y,Z);
-        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDY_D,step,X,Y,Z);
-        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDZ_D,step,X,Y,Z);
+        DDY <<<blocks,threads>>> (DDY_D,DATA_ORIGINAL,X,Y,Z,10.);
+        DDZ <<<blocks,threads>>> (DDZ_D,DATA_ORIGINAL,X,Y,Z,10.);
+        DDX <<<blocks,threads>>> (DDX_D,DATA_ORIGINAL,X,Y,Z,10.);     //add into state 1
+        ADD <<<blocks,threads>>> (DATA_NEXT,DDX_D,step,X,Y,Z);
+        ADD <<<blocks,threads>>> (DATA_NEXT,DDY_D,step,X,Y,Z);
+        ADD <<<blocks,threads>>> (DATA_NEXT,DDZ_D,step,X,Y,Z);
         //compare state1 state 0
-        COMPARE<<<Y-2,Z-2>>>(DATA_ORIGINAL,DATA_NEXT,CC,X,Y,Z);
+        COMPARE<<<blocks,threads>>>(DATA_ORIGINAL,DATA_NEXT,CC,X,Y,Z);
         //copy back max error
         cudaMemcpy(&CCD,CC,sizeof(double),cudaMemcpyDeviceToHost);
         //make state 1 as state0
-        ASSIGN  <<<Y-2,Z-2>>>  (DATA_ORIGINAL,DATA_NEXT,X,Y,Z);
+        ASSIGN  <<<blocks,threads>>>  (DATA_ORIGINAL,DATA_NEXT,X,Y,Z);
         //update counter
         ct += 1;
         //information every 1000 loops because of visibility
@@ -222,7 +223,7 @@ int main()
     //final print statement
     printf("\n\nConverged in %d loops\n\n",ct-1);
     //display optional
-    //display(DATA_F,X,Y,Z);
+    display(DATA_F,X,Y,Z);
     //free pointers
     cudaFree(DATA_ORIGINAL);
     cudaFree(DATA_NEXT);
