@@ -148,8 +148,6 @@ void DDZ(double* R, double* C,int X,int Y,int Z, double dz)
                 if(err_max>abs(*(temp_field+i+RANGE*j+RANGE*RANGE*k) - *(field+i+RANGE*j+RANGE*RANGE*k)))
                     err_max = *(temp_field+i+RANGE*j+RANGE*RANGE*k) - *(field+i+RANGE*j+RANGE*RANGE*k);
                 loopctr++;
-                 //if(loopctr%2000000==0)
-                 //    std::cout<<loopctr<<" iters\n";
                 *(temp_field+i+RANGE*j+RANGE*RANGE*k) = *(field+i+RANGE*j+RANGE*RANGE*k);
              }
          }

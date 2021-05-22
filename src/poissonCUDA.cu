@@ -20,7 +20,11 @@ struct BOX
 //X double derivative
 __global__ void DDX(double* R, double* C,int X,int Y,int Z,double dx)
 {
-    int index = threadIdx.x*X + blockIdx.x*X*Y + X+X*Y;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
+
     for(int i=1;i<X-1;i++)
     {
         *(R+index+i) = (*(C+index+1+i) + *(C+index-1+i) - 2* *(C+index+i))/(dx*dx);
@@ -30,7 +34,10 @@ __global__ void DDX(double* R, double* C,int X,int Y,int Z,double dx)
 //Y double derivative
 __global__ void DDY(double* R, double* C,int X,int Y,int Z, double dy)
 {
-    int index = threadIdx.x + blockIdx.x*X*Y+X+X*Y;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=1;i<Y-1;i++)
     {
         *(R+index+i*X) = (*(C+index+X*(i+1)) + *(C+index+X*(i-1)) - 2* *(C+index+i*X))/(dy*dy);
@@ -40,7 +47,10 @@ __global__ void DDY(double* R, double* C,int X,int Y,int Z, double dy)
 //Z double derivative
 __global__ void DDZ(double* R, double* C,int X,int Y,int Z, double dz)
 {
-    int index = threadIdx.x + blockIdx.x*X+X+X*Y;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=0;i<Z-1;i++)
     {
         *(R+index+i*X*Y) = (*(C+index+X*Y*(i+1)) + *(C+index+X*Y*(i-1))- 2* *(C+index+i*X*Y))/(dz*dz);
@@ -50,7 +60,10 @@ __global__ void DDZ(double* R, double* C,int X,int Y,int Z, double dz)
 //parallel function to update matrices
 __global__ void ASSIGN(double* R, double* C,int X,int Y,int Z)
 {
-    int index = threadIdx.x*X + blockIdx.x*X*Y + X + X*Y ;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=1;i<X-1;i++)
     {
         *(R+index+i) = *(C+index+i);
@@ -60,7 +73,10 @@ __global__ void ASSIGN(double* R, double* C,int X,int Y,int Z)
 //parallel function to add two matrices
 __global__ void ADD(double* R,double* C,double dt,int X,int Y,int Z)
 {
-    int index = threadIdx.x*X+blockIdx.x*X*Y+X+X*Y;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=0;i<X;i++)
     {
         *(R+index+i) += (*(C+index+i) * dt);
@@ -70,7 +86,10 @@ __global__ void ADD(double* R,double* C,double dt,int X,int Y,int Z)
 //parallel function to compare two matrices, outputting a maximum difference bteween elements
 __global__ void COMPARE(double* R, double* C, double* OUT_H,int X,int Y,int Z)
 {
-    int index = threadIdx.x * X + blockIdx.x * X * Y+X+X*Y;
+    int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    int idy = idx / (Y-2) ;
+    int idz = idx % (Y-2) ;
+    int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=1;i<X-1;i++)
     {
         if(abs(*(R+index+i)-*(C+index+i))>= *OUT_H)
@@ -101,7 +120,7 @@ int main()
 {
     //DECLARE YOUR VARIABLES HERE
     
-    struct BOX grid = {30,30,30};
+    struct BOX grid = {20,20,20};
     //step for double derivatives
     double step = 0.01;
     //tolerence
@@ -177,12 +196,12 @@ int main()
         //reset difference every loop
         RESET_CTR  <<<1,1>>>  (CC);
         //run derivatives
-        DDY <<<Z-2,X-2>>> (DDY_D,DATA_ORIGINAL,X,Y,Z,10.);
-        DDZ <<<X-2,Y-2>>> (DDZ_D,DATA_ORIGINAL,X,Y,Z,10.);
-        DDX <<<Y-2,Z-2>>> (DDX_D,DATA_ORIGINAL,X,Y,Z,10.);     //add into state 1
-        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDX_D,step,X,Y,Z);
-        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDY_D,step,X,Y,Z);
-        ADD <<<Y-2,Z-2>>> (DATA_NEXT,DDZ_D,step,X,Y,Z);
+        DDY <<<Y*Z/8,8>>> (DDY_D,DATA_ORIGINAL,X,Y,Z,10.);
+        DDZ <<<Y*Z/8,8>>> (DDZ_D,DATA_ORIGINAL,X,Y,Z,10.);
+        DDX <<<Y*Z/8,8>>> (DDX_D,DATA_ORIGINAL,X,Y,Z,10.);     //add into state 1
+        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDX_D,step,X,Y,Z);
+        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDY_D,step,X,Y,Z);
+        ADD <<<Y*Z/8,8>>> (DATA_NEXT,DDZ_D,step,X,Y,Z);
         //compare state1 state 0
         COMPARE<<<Y-2,Z-2>>>(DATA_ORIGINAL,DATA_NEXT,CC,X,Y,Z);
         //copy back max error
