@@ -1,10 +1,13 @@
-//Three Dimensional Poisson solver
+//Three Dimensional Poisson solver using NVIDIA CUDA
 //Author: Arkavo Hait, 2021
 
 
 #include <stdio.h>
 #include <iostream>
 #include <cmath>
+#include <time.h>
+#include <chrono>
+#include <string>
 #include <limits.h>
 
 using namespace std;
@@ -21,13 +24,16 @@ struct BOX
 __global__ void DDX(double* R, double* C,int X,int Y,int Z,double dx)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
-    int idy = idx / (Y-2) ;
-    int idz = idx % (Y-2) ;
-    int index = idy*X + idz*X*Y + X+X*Y;
-
-    for(int i=1;i<X-1;i++)
+    if(idx<((Y-2)*(Z-2)))
     {
-        *(R+index+i) = (*(C+index+1+i) + *(C+index-1+i) - 2* *(C+index+i))/(dx*dx);
+        int idy = idx / (Y-2) ;
+        int idz = idx % (Y-2) ;
+        int index = idy*X + idz*X*Y + X+X*Y;
+
+        for(int i=1;i<X-1;i++)
+        {
+            *(R+index+i) = (*(C+index+1+i) + *(C+index-1+i) - 2* *(C+index+i))/(dx*dx);
+        }
     }
 }
 
@@ -35,58 +41,63 @@ __global__ void DDX(double* R, double* C,int X,int Y,int Z,double dx)
 __global__ void DDY(double* R, double* C,int X,int Y,int Z, double dy)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx<((Y-2)*(Z-2))){
     int idy = idx / (Y-2) ;
     int idz = idx % (Y-2) ;
     int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=1;i<Y-1;i++)
     {
         *(R+index+i*X) = (*(C+index+X*(i+1)) + *(C+index+X*(i-1)) - 2* *(C+index+i*X))/(dy*dy);
-    }
+    }}
 }
 
 //Z double derivative
 __global__ void DDZ(double* R, double* C,int X,int Y,int Z, double dz)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx<((Y-2)*(Z-2))){
     int idy = idx / (Y-2) ;
     int idz = idx % (Y-2) ;
     int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=0;i<Z-1;i++)
     {
         *(R+index+i*X*Y) = (*(C+index+X*Y*(i+1)) + *(C+index+X*Y*(i-1))- 2* *(C+index+i*X*Y))/(dz*dz);
-    }
+    }}
 }
 
 //parallel function to update matrices
 __global__ void ASSIGN(double* R, double* C,int X,int Y,int Z)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx<((Y-2)*(Z-2))){
     int idy = idx / (Y-2) ;
     int idz = idx % (Y-2) ;
     int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=1;i<X-1;i++)
     {
         *(R+index+i) = *(C+index+i);
-    }
+    }}
 }
 
 //parallel function to add two matrices
 __global__ void ADD(double* R,double* C,double dt,int X,int Y,int Z)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx<((Y-2)*(Z-2))){
     int idy = idx / (Y-2) ;
     int idz = idx % (Y-2) ;
     int index = idy*X + idz*X*Y + X+X*Y;
     for(int i=0;i<X;i++)
     {
         *(R+index+i) += (*(C+index+i) * dt);
-    }
+    }}
 }
 
 //parallel function to compare two matrices, outputting a maximum difference bteween elements
 __global__ void COMPARE(double* R, double* C, double* OUT_H,int X,int Y,int Z)
 {
     int idx = threadIdx.x + blockIdx.x*blockDim.x;
+    if(idx<((Y-2)*(Z-2))){
     int idy = idx / (Y-2) ;
     int idz = idx % (Y-2) ;
     int index = idy*X + idz*X*Y + X+X*Y;
@@ -96,7 +107,7 @@ __global__ void COMPARE(double* R, double* C, double* OUT_H,int X,int Y,int Z)
         {
             *OUT_H = abs(*(R+index+i) - *(C+index+i));
         }
-    }
+    }}
 }
 
 //reset function, use it to reset any pointer
@@ -116,11 +127,28 @@ void display(double* DATA,int X,int Y,int Z)
 }
 
 //main fxn, will fix with args after
-int main()
+int main(int argc, char* argv[])
 {
-    //DECLARE YOUR VARIABLES HERE
     
-    struct BOX grid = {100,60,60};
+    //DECLARE YOUR VARIABLES HERE
+    struct BOX grid;
+    int threads;
+    std::cout<<argc<<"\n";
+    if(argc==2)
+    {
+        threads = stoi(argv[1]);
+        grid.X=10;
+        grid.Y=10;
+        grid.Z=10;
+    }
+    if(argc>2)
+    {
+        threads = stoi(argv[1]);
+        grid.X = stoi(argv[2]);
+        grid.Y = stoi(argv[3]);
+        grid.Z = stoi(argv[4]);
+    }
+    std::cout<<"Threads: "<<threads<<"\n";
     //step for double derivatives
     double step = 0.01;
     //tolerence
@@ -129,7 +157,7 @@ int main()
     const int X = grid.X;
     const int Y = grid.Y;
     const int Z = grid.Z;
-    printf("\n%d %d %d\n",X,Y,Z);
+    printf("\nX%d Y%d Z%d -> Total Capacity = %d\n",X,Y,Z,X*Y*Z);
     unsigned long long SIZE_0 = ((int)sizeof(double))*X*Y*Z;
     double* DATA_H; 
     double* DATA_F;
@@ -176,7 +204,7 @@ int main()
     cudaMalloc(&CC,(int)sizeof(double));
     
     //token counter
-    CCD = 10;
+    CCD = 10.;
     //copy data state0, state1 
     cudaMemcpy(DATA_ORIGINAL,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
     cudaMemcpy(DATA_NEXT,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
@@ -189,9 +217,10 @@ int main()
     
     //counter
     int ct = 0;
-    int threads = 4;
-    int blocks = (Y-2) * (Z-2) / threads;
-    //run while tolerence > difference
+    
+    int blocks = 1 + (Y-2) * (Z-2) / threads;
+    
+    //run while tolerence > differences
     while(CCD>tol)
     {
         //reset difference every loop
@@ -222,8 +251,10 @@ int main()
     cudaMemcpy(DATA_F,DATA_ORIGINAL,SIZE_0,cudaMemcpyDeviceToHost);
     //final print statement
     printf("\n\nConverged in %d loops\n\n",ct-1);
+    
     //display optional
-    display(DATA_F,X,Y,Z);
+    //display(DATA_F,X,Y,Z);
+    
     //free pointers
     cudaFree(DATA_ORIGINAL);
     cudaFree(DATA_NEXT);
