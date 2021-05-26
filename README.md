@@ -17,6 +17,6 @@ Given the boundary conditions, the quantities inside the volume will adjust, sta
 
 We will feed the XYZ matrix into the GPU. Due to boundary conditions being strictly on the walls, we can use the matrix for computation as (X-2)(Y-2)(Z-2). We will define an index based on the new matrix in each of our functions and then will map it to our **Block, Thread** system where the total number of blocks x threads will be equal to or just more than (X-2)(Y-2)(Z-2) to facilitate threading. This is to ensure that we can directly specify the number of *threads* in our execution.
 
-##Results
+## Results
 
 We will be comparing converge times with respect to data size and threads. Since this is fully done on a local machine right now. Please excuse the low data capacities. I will be making a study on large data as soon as I have access to a sufficiently powerful machine.
