@@ -46,7 +46,9 @@ Threads|X|Y|Z|Size|Execution Time(s)
 ![fig](https://user-images.githubusercontent.com/16555024/119909307-2c93e900-bf72-11eb-8079-c8134f6589c2.png)
 
 We can see a drastic change in computation times in the GPU as the aggregate data size goes up. From 150s in single thread to a mere 39s in double threads, which almost a *4x* speedup. Going further till 4, 8 and 16 threads per block we see faster results as *7.5x, 10x, 12x* speedups on average. I was surprised to see a speedup in 16 cores since I believed my own machine to cap out at 8 threads/block. If this scale gets too improper to understand, we can try seeing this on a log scale as:
+
 ![log_fig](https://user-images.githubusercontent.com/16555024/119910066-ec356a80-bf73-11eb-8c82-833529214fae.png).
+
 This figure exists to inform us about the extensive speedups we get when the order of magnitude of data points change.
 
 ## Personal Thoughts
