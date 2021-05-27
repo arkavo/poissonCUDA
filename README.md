@@ -24,3 +24,4 @@ The main source file is under src folder. You may need to recomplie it as you se
 ## Results
 
 We will be comparing converge times with respect to data size and threads. Since this is fully done on a local machine right now. Please excuse the low data capacities. I will be making a study on large data as soon as I have access to a sufficiently powerful machine.
+![fig](https://user-images.githubusercontent.com/16555024/119909307-2c93e900-bf72-11eb-8079-c8134f6589c2.png)
