@@ -6,4 +6,4 @@ for i in threads:
     for j in data:
         for k in data:
             for l in data:
-                sp.call(["nvprof", "--csv", "--log-file", "profiler_output.txt", "--metrics","achieved_occupancy", "./pCUDA.exe", str(i), str(j), str(k), str(l)])
+                sp.call(["./pCUDA.exe",str(i),str(j),str(k),str(l)])

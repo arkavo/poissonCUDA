@@ -9,6 +9,7 @@
 #include <chrono>
 #include <string>
 #include <limits.h>
+#include <fstream>
 
 using namespace std;
 
@@ -116,7 +117,7 @@ __global__ void RESET_CTR(double* C)
     *C = 0;
 }
 
-//display function, use to disaply any array
+//display function, use to disaply any array [deprecated for future use]
 void display(double* DATA,int X,int Y,int Z)
 {
     for(int k=0;k<Z;k++)
@@ -129,6 +130,10 @@ void display(double* DATA,int X,int Y,int Z)
 //main fxn, will fix with args after
 int main(int argc, char* argv[])
 {
+    std::ofstream file;
+    file.open("data.csv",ios::app);
+    
+    //file<<"Threads, X, Y, Z, Total, Time\n";
     
     //DECLARE YOUR VARIABLES HERE
     struct BOX grid;
@@ -149,15 +154,17 @@ int main(int argc, char* argv[])
         grid.Z = stoi(argv[4]);
     }
     std::cout<<"Threads: "<<threads<<"\n";
-    //step for double derivatives
-    double step = 0.01;
-    //tolerence
-    double tol = 0.0001;
-    
     const int X = grid.X;
     const int Y = grid.Y;
     const int Z = grid.Z;
-    printf("\nX%d Y%d Z%d -> Total Capacity = %d\n",X,Y,Z,X*Y*Z);
+    int blocks = 1 + (Y-2) * (Z-2) / threads;
+    std::cout<<"Blocks: "<<blocks<<"\n";
+    //step for double derivatives
+    double step = 0.001;
+    //tolerence
+    double tol = 0.00001;
+    
+    std::cout<<"\nX"<<X<<" Y"<<Y<<" Z"<<Z<<" Total Capacity⇒"<<X*Y*Z<<endl;
     unsigned long long SIZE_0 = ((int)sizeof(double))*X*Y*Z;
     double* DATA_H; 
     double* DATA_F;
@@ -208,18 +215,12 @@ int main(int argc, char* argv[])
     //copy data state0, state1 
     cudaMemcpy(DATA_ORIGINAL,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
     cudaMemcpy(DATA_NEXT,DATA_H,SIZE_0,cudaMemcpyHostToDevice);
-    //data arrays for final copies
-    //double DATA_F[X][Y][Z];
-    
-    //double DATA_FF[X][Y][Z];
-    
-    //cudaMemcpy(&DATA_FF,DATA_ORIGINAL,SIZE_0,cudaMemcpyDeviceToHost);
     
     //counter
     int ct = 0;
     
-    int blocks = 1 + (Y-2) * (Z-2) / threads;
     
+    auto hst_st = std::chrono::high_resolution_clock::now();
     //run while tolerence > differences
     while(CCD>tol)
     {
@@ -247,11 +248,17 @@ int main(int argc, char* argv[])
             printf("%d loops %0.6lf max error\r",ct,CCD);
         }
     }
+
     //copy back final array
     cudaMemcpy(DATA_F,DATA_ORIGINAL,SIZE_0,cudaMemcpyDeviceToHost);
+    auto hst_en = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<float> duration = hst_en-hst_st;
+    std::cout<<"\nDuration: "<<duration.count()<<"\n";
     //final print statement
-    printf("\n\nConverged in %d loops\n\n",ct-1);
-    
+    std::cout<<"\n\nConverged in "<<ct-1<<" loops\n\n";
+    //file<<"Threads, X, Y, Z, Total, Time\n";
+    file<<threads<<","<<X<<","<<Y<<","<<Z<<","<<X*Y*Z<<","<<duration.count()<<"\n";
+    file.close();
     //display optional
     //display(DATA_F,X,Y,Z);
     
