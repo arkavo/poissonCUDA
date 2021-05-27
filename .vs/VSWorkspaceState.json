@@ -1,7 +1,8 @@
 {
   "ExpandedNodes": [
-    ""
+    "",
+    "\\src"
   ],
-  "SelectedNode": "\\coresolver.cu",
+  "SelectedNode": "\\src\\Profiling.nvact",
   "PreviewInSolutionExplorer": false
 }

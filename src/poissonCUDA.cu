@@ -133,7 +133,7 @@ int main(int argc, char* argv[])
     //DECLARE YOUR VARIABLES HERE
     struct BOX grid;
     int threads;
-    std::cout<<argc<<"\n";
+    //std::cout<<argc<<"\n";
     if(argc==2)
     {
         threads = stoi(argv[1]);
@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
     //step for double derivatives
     double step = 0.01;
     //tolerence
-    double tol = 0.00001;
+    double tol = 0.0001;
     
     const int X = grid.X;
     const int Y = grid.Y;
